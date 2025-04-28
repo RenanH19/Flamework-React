@@ -1,0 +1,18 @@
+{
+  "name": "2025api",
+  "version": "1.0.0",
+  "description": "minha api linda",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "mysql2": "^3.14.0",
+    "nodemon": "^3.1.9"
+  }
+}
