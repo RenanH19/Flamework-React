@@ -42,7 +42,6 @@ const verifyToken = (token) => {
     return jwt.verify(token, process.env.JWT_SECRET);
 };
 const bcrypt = require('bcryptjs');
-const SALT_ROUNDS = 10;
 
 function authenticate(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1];
