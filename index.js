@@ -61,7 +61,7 @@ function authenticate(req, res, next) {
 app.post('/api/login', function (req, res) {
   const { email, senha } = req.body;  
   console.log("req.body",email);
-  const sql = "SELECT u.id, u.senha, u.email FROM usuario u WHERE u.email = ?";
+  const sql = "SELECT u.id, u.nome, u.senha, u.email FROM usuario u WHERE u.email = ?";
 
   conn.query(sql, [email], function (err, result) {
     if (err) {        
@@ -81,7 +81,7 @@ app.post('/api/login', function (req, res) {
         }
       
         const token = generateToken(usuario.id, usuario.email);
-        res.json({ token });
+        res.json({ token, id: usuario.id, nome: usuario.nome });
       });
    
   });
@@ -163,6 +163,59 @@ app.delete('/api/usuario/:id', (req, res) => {
       res.status(200).json({ message: "Usuário deletado com sucesso" });
   });
 });
+
+
+// Rota para buscar todos os tópicos
+app.get('/api/topicos', (req, res) => {
+  const sql = "SELECT * FROM topicos ORDER BY id DESC";
+  conn.query(sql, function (err, result) {
+    if (err) {
+      console.error("Erro ao buscar tópicos:", err);
+      return res.status(500).json({ error: "Erro ao buscar tópicos" });
+    }
+    res.status(200).json(result);
+  });
+});
+
+// Rota para criar um novo tópico
+app.post('/api/topicos', (req, res) => {
+  const { assunto, texto, autor } = req.body;
+  
+  const usuarioId = req.headers['userid']; 
+
+  if (!usuarioId) {
+    return res.status(401).json({ error: "Usuário não autenticado" });
+  }
+  if (!assunto || !texto || !autor) {
+    return res.status(400).json({ error: "Assunto, texto e autor são obrigatórios" });
+  }
+
+  const sql = "INSERT INTO topicos (assunto, texto, autor, usuario_id) VALUES (?, ?, ?, ?)";
+  conn.query(sql, [assunto, texto, autor, usuarioId], function (err, result) {
+    if (err) {
+      console.error("Erro ao criar tópico:", err);
+      return res.status(500).json({ error: "Erro ao criar tópico" });
+    }
+
+    res.status(201).json({ id: result.insertId, assunto, texto, autor, usuario_id: usuarioId });
+  });
+});
+
+app.delete('/api/topicos/:id', (req, res) => {
+  const { id } = req.params;
+
+  const sql = "DELETE FROM topicos WHERE id = ?";
+  conn.query(sql, [id], function (err, result) {
+    if (err) {
+      console.error("Erro ao deletar tópico:", err);
+      return res.status(500).json({ error: "Erro ao deletar tópico" });
+    }
+
+    res.status(200).json({ message: "Tópico deletado com sucesso" });
+  });
+});
+
+
 
 app.listen(PORT, function (err) {
   if (err) console.log(err);
