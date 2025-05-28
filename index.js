@@ -26,6 +26,7 @@ conn.connect(function (err) {
   console.log("Connected!");
 });
 
+
 const generateToken = (id, email) => {
   return jwt.sign({
         id: id, 
@@ -57,10 +58,37 @@ function authenticate(req, res, next) {
     res.status(401).json({ error: 'Token inválido' });
   }
 }
- 
+
+app.post('/reconnect-db', (req, res) => {
+  // Destroi a conexão antiga (se houver)
+  if (conn && conn.destroy) {
+    conn.destroy();
+  }
+
+  // Cria uma nova conexão
+  conn = mysql.createConnection({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT    
+  });
+
+  conn.connect(function (err) {
+    if (err) {
+      console.error('Erro ao reconectar:', err);
+      return res.status(500).json({ message: 'Erro ao reconectar ao banco de dados.' });
+    }
+    console.log("Reconectado ao banco de dados!");
+    res.json({ message: 'Reconectado com sucesso ao banco de dados!' });
+  });
+});
+
+
+
 app.post('/api/login', function (req, res) {
   const { email, senha } = req.body;  
-  console.log("req.body",email);
+  //console.log("req.body",email);
   const sql = "SELECT u.id, u.nome, u.senha, u.email FROM usuario u WHERE u.email = ?";
 
   conn.query(sql, [email], function (err, result) {
@@ -131,7 +159,7 @@ app.post('/api/usuario', async function (req, res) {
 
 app.get('/api/usuario/:id', (req, res) => {
   const { id } = req.params;
-  console.log("ID recebido:", id);
+  //console.log("ID recebido:", id);
 
   const sql = "SELECT u.id, u.nome, u.email, senha FROM usuario u WHERE u.id = ?";
   conn.query(sql, [id], function (err, result) {
@@ -144,7 +172,7 @@ app.get('/api/usuario/:id', (req, res) => {
           return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
-      console.log("Usuário encontrado:", result[0]);
+      //console.log("Usuário encontrado:", result[0]);
       res.status(200).json(result[0]);
   });
 });
@@ -179,10 +207,10 @@ app.get('/api/topicos', (req, res) => {
 
 // Rota para criar um novo tópico
 app.post('/api/topicos', (req, res) => {
-  const { assunto, texto, autor } = req.body;
+  const { assunto, texto, autor} = req.body;
   
   const usuarioId = req.headers['userid']; 
-
+ 
   if (!usuarioId) {
     return res.status(401).json({ error: "Usuário não autenticado" });
   }
@@ -215,6 +243,20 @@ app.delete('/api/topicos/:id', (req, res) => {
   });
 });
 
+app.put('/api/topicos/:id', (req, res) => {
+  const { id } = req.params;
+  const { assunto, texto, autor } = req.body;
+
+  const sql = "UPDATE topicos SET assunto = ?, texto = ?, autor = ? WHERE id = ?";
+  conn.query(sql, [assunto, texto, autor, id], (err, result) => {
+    if (err) {
+      console.error("Erro ao atualizar tópico:", err);
+      return res.status(500).json({ error: "Erro ao atualizar tópico" });
+    }
+
+    res.status(200).json({ id, assunto, texto, autor });
+  });
+});
 
 
 app.listen(PORT, function (err) {
