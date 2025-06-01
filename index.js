@@ -45,6 +45,7 @@ const bcrypt = require('bcryptjs');
 
 function authenticate(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
+  //console.log("Token criado:",token);
   
   if (!token) {
     return res.status(401).json({ error: 'Token não fornecido' });
@@ -64,7 +65,6 @@ app.post('/reconnect-db', (req, res) => {
   if (conn && conn.destroy) {
     conn.destroy();
   }
-
   // Cria uma nova conexão
   conn = mysql.createConnection({
     host: process.env.DB_HOST,
@@ -83,8 +83,6 @@ app.post('/reconnect-db', (req, res) => {
     res.json({ message: 'Reconectado com sucesso ao banco de dados!' });
   });
 });
-
-
 
 app.post('/api/login', function (req, res) {
   const { email, senha } = req.body;  
@@ -115,7 +113,7 @@ app.post('/api/login', function (req, res) {
   });
 });
 
-app.get('/api/usuario', authenticate, function (req, res) {
+app.get('/api/usuario/', authenticate, function (req, res) {
     let sql = "SELECT u.id, u.nome, u.email, u.senha FROM usuario u";
     conn.query(sql, function (err, result) {
         if (err) res.status(500).json(err);
@@ -123,6 +121,22 @@ app.get('/api/usuario', authenticate, function (req, res) {
     });
 });
 
+app.get('/api/usuario/:id',authenticate, function(req, res) {
+  const { id } = req.params; 
+  const sql = "SELECT u.id, u.nome, u.email, senha FROM usuario u WHERE u.id = ?";
+  conn.query(sql, [id], function (err, result) {
+      if (err) {
+          console.error("Erro ao buscar usuário:", err);
+          return res.status(500).json({ error: "Erro no servidor" });
+      }
+      if (result.length === 0) {
+          return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      res.status(200).json(result[0]);
+  });
+});
+
+//cadastro
 app.post('/api/usuario', async function (req, res) {
   var usuario = req.body;
   var sql = '';
@@ -157,26 +171,6 @@ app.post('/api/usuario', async function (req, res) {
   }
 });
 
-app.get('/api/usuario/:id', (req, res) => {
-  const { id } = req.params;
-  //console.log("ID recebido:", id);
-
-  const sql = "SELECT u.id, u.nome, u.email, senha FROM usuario u WHERE u.id = ?";
-  conn.query(sql, [id], function (err, result) {
-      if (err) {
-          console.error("Erro ao buscar usuário:", err);
-          return res.status(500).json({ error: "Erro no servidor" });
-      }
-
-      if (result.length === 0) {
-          return res.status(404).json({ error: "Usuário não encontrado" });
-      }
-
-      //console.log("Usuário encontrado:", result[0]);
-      res.status(200).json(result[0]);
-  });
-});
-
 app.delete('/api/usuario/:id', (req, res) => {
   const { id } = req.params;
 
@@ -192,9 +186,8 @@ app.delete('/api/usuario/:id', (req, res) => {
   });
 });
 
-
 // Rota para buscar todos os tópicos
-app.get('/api/topicos', (req, res) => {
+app.get('/api/topicos', authenticate, (req, res) => {
   const sql = "SELECT * FROM topicos ORDER BY id DESC";
   conn.query(sql, function (err, result) {
     if (err) {
@@ -210,6 +203,7 @@ app.post('/api/topicos', (req, res) => {
   const { assunto, texto, autor} = req.body;
   
   const usuarioId = req.headers['userid']; 
+  console.log(usuarioId);
  
   if (!usuarioId) {
     return res.status(401).json({ error: "Usuário não autenticado" });
@@ -229,21 +223,33 @@ app.post('/api/topicos', (req, res) => {
   });
 });
 
-app.delete('/api/topicos/:id', (req, res) => {
+// Rota para deletar um tópico
+app.delete('/api/topicos/:id', authenticate, (req, res) => {
   const { id } = req.params;
 
-  const sql = "DELETE FROM topicos WHERE id = ?";
-  conn.query(sql, [id], function (err, result) {
+  // Primeiro, deletar os comentários relacionados
+  const sqlDeleteComentarios = "DELETE FROM comentarios WHERE topico_id = ?";
+  conn.query(sqlDeleteComentarios, [id], function (err, result) {
     if (err) {
-      console.error("Erro ao deletar tópico:", err);
-      return res.status(500).json({ error: "Erro ao deletar tópico" });
+      console.error("Erro ao deletar comentários do tópico:", err);
+      return res.status(500).json({ error: "Erro ao deletar comentários do tópico" });
     }
 
-    res.status(200).json({ message: "Tópico deletado com sucesso" });
+    // Depois, deletar o tópico
+    const sqlDeleteTopico = "DELETE FROM topicos WHERE id = ?";
+    conn.query(sqlDeleteTopico, [id], function (err, result) {
+      if (err) {
+        console.error("Erro ao deletar tópico:", err);
+        return res.status(500).json({ error: "Erro ao deletar tópico" });
+      }
+
+      return res.status(200).json({ message: "Tópico deletado com sucesso" });
+    });
   });
 });
 
-app.put('/api/topicos/:id', (req, res) => {
+// Rota para editar um tópico
+app.put('/api/topicos/:id', authenticate, (req, res) => {
   const { id } = req.params;
   const { assunto, texto, autor } = req.body;
 
@@ -258,6 +264,38 @@ app.put('/api/topicos/:id', (req, res) => {
   });
 });
 
+//Rota comentários
+app.post('/api/comentarios', (req, res) => {
+  const { texto, autor, topico_id } = req.body;
+
+  if (!texto || !autor || !topico_id) {
+    return res.status(400).json({ error: "Texto, autor e topico_id são obrigatórios" });
+  }
+
+  const sql = "INSERT INTO comentarios (texto, autor, topico_id) VALUES (?, ?, ?)";
+  conn.query(sql, [texto, autor, topico_id], function (err, result) {
+    if (err) {
+      console.error("Erro ao salvar comentário:", err);
+      return res.status(500).json({ error: "Erro ao salvar comentário" });
+    }
+
+    res.status(201).json({ id: result.insertId, texto, autor, topico_id });
+  });
+});
+
+app.get('/api/comentarios/:topicoId', (req, res) => {
+  const { topicoId } = req.params;
+
+  const sql = "SELECT * FROM comentarios WHERE topico_id = ? ORDER BY id DESC";
+  conn.query(sql, [topicoId], function (err, result) {
+    if (err) {
+      console.error("Erro ao buscar comentários:", err);
+      return res.status(500).json({ error: "Erro ao buscar comentários" });
+    }
+
+    res.status(200).json(result);
+  });
+});
 
 app.listen(PORT, function (err) {
   if (err) console.log(err);
