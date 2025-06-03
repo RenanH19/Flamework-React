@@ -26,14 +26,13 @@ conn.connect(function (err) {
   console.log("Connected!");
 });
 
-
 const generateToken = (id, email) => {
   return jwt.sign({
         id: id, 
         email: email
       }, 
       process.env.JWT_SECRET, {
-      expiresIn: '1h'
+      expiresIn: '20s'
   });
 };
 
@@ -60,6 +59,11 @@ function authenticate(req, res, next) {
   }
 }
 
+//rota para validar token
+app.get('/api/validate-token', authenticate, (req, res) => {
+  res.status(200).json({ valid: true });
+});
+
 app.post('/reconnect-db', (req, res) => {
   // Destroi a conexão antiga (se houver)
   if (conn && conn.destroy) {
@@ -73,7 +77,6 @@ app.post('/reconnect-db', (req, res) => {
     database: process.env.DB_NAME,
     port: process.env.DB_PORT    
   });
-
   conn.connect(function (err) {
     if (err) {
       console.error('Erro ao reconectar:', err);
@@ -88,24 +91,19 @@ app.post('/api/login', function (req, res) {
   const { email, senha } = req.body;  
   //console.log("req.body",email);
   const sql = "SELECT u.id, u.nome, u.senha, u.email FROM usuario u WHERE u.email = ?";
-
   conn.query(sql, [email], function (err, result) {
     if (err) {        
       console.error(err);
       return res.status(500).send("Erro no servidor");
     }
-
     if (result.length === 0) {
       return res.status(401).send("Email ou senha inválidos");
     }
-
     const usuario = result[0];
-
     bcrypt.compare(senha, usuario.senha, function(err, senhaCorreta) {
         if (err || !senhaCorreta) {
           return res.status(401).send("Email ou senha inválidos");
-        }
-      
+        }      
         const token = generateToken(usuario.id, usuario.email);
         res.json({ token, id: usuario.id, nome: usuario.nome });
       });
