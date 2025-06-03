@@ -32,7 +32,7 @@ const generateToken = (id, email) => {
         email: email
       }, 
       process.env.JWT_SECRET, {
-      expiresIn: '20s'
+      expiresIn: '1h'
   });
 };
 
@@ -264,20 +264,20 @@ app.put('/api/topicos/:id', authenticate, (req, res) => {
 
 //Rota comentários
 app.post('/api/comentarios', (req, res) => {
-  const { texto, autor, topico_id } = req.body;
+  const { texto, autor, topico_id, usuario_id } = req.body;
 
-  if (!texto || !autor || !topico_id) {
-    return res.status(400).json({ error: "Texto, autor e topico_id são obrigatórios" });
+  if (!texto || !autor || !topico_id || !usuario_id) {
+    return res.status(400).json({ error: "Texto, autor, topico_id e usuario_id são obrigatórios" });
   }
 
-  const sql = "INSERT INTO comentarios (texto, autor, topico_id) VALUES (?, ?, ?)";
-  conn.query(sql, [texto, autor, topico_id], function (err, result) {
+  const sql = "INSERT INTO comentarios (texto, autor, topico_id, usuario_id) VALUES (?, ?, ?, ?)";
+  conn.query(sql, [texto, autor, topico_id, usuario_id], function (err, result) {
     if (err) {
       console.error("Erro ao salvar comentário:", err);
       return res.status(500).json({ error: "Erro ao salvar comentário" });
     }
 
-    res.status(201).json({ id: result.insertId, texto, autor, topico_id });
+    res.status(201).json({ id: result.insertId, texto, autor, topico_id, usuario_id });
   });
 });
 
